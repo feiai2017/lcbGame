@@ -2,13 +2,13 @@ package control
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"mania/constant"
 	"mania/logger"
+	"strconv"
 	"time"
 )
 
@@ -18,18 +18,9 @@ type Storage struct {
 }
 
 var Store Storage
-var expireTime = 180
 
 const Online = 1
 const Offline = 0
-
-type serverInfo struct {
-	IP        string `json:"ip"`
-	Port      int    `json:"port"`
-	ServerKey string `json:"serverKey"`
-	Node      string `json:"node"`
-	Time      string `json:"time"`
-}
 
 func (s *Storage) Connect(configSrvName string) error {
 	defer func(start time.Time) {
@@ -59,33 +50,8 @@ func (s *Storage) Connect(configSrvName string) error {
 	return nil
 }
 
-func (s *Storage) RegisterTimedTasks(d time.Duration, node string) {
-	defer func() {
-		if x := recover(); x != nil {
-			logger.Error("RegisterTimedTasks", "x", x)
-		}
-	}()
-
-	t := time.NewTimer(d)
-
-	for {
-		select {
-		case <-t.C:
-			//conn := s.RedisConn.Get()
-			//s.setBlackList(conn)
-			//s.setWhiteList(conn)
-			s.concurrentUser(node)
-			s.setUserOnlineTTL(node)
-			s.setServerRunningTTL(node)
-			//conn.Close()
-			t.Reset(d)
-		}
-	}
-}
-
 func (s *Storage) CloseDB() {
-	s.DelServerInfo(constant.SERVER_NAME)
-	_ = s.DelUserOnline(constant.SERVER_NAME)
+	_ = s.DelUserOnline(constant.ServerName)
 
 	err := s.RedisConn.Close()
 	if err != nil {
@@ -99,73 +65,14 @@ func (s *Storage) CloseDB() {
 	logger.Error("release DB success")
 }
 
-func (s *Storage) setServerRunningTTL(node string) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-
-	key := fmt.Sprintf("SERVERRUNNING::%s", node)
-	_, err := conn.Do("SET", key, 1, "EX", expireTime)
-	if err != nil {
-		logger.Error("setServerRunningTTL", "key", key, "err", err.Error())
-		return
-	}
-}
-
-func (s *Storage) delServerRunningTTL(node string) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-
-	key := fmt.Sprintf("SERVERRUNNING::%s", node)
-	_, err := conn.Do("DEL", key)
-	if err != nil {
-		logger.Error("delServerRunningTTL", "key", key, "err", err.Error())
-		return
-	}
-}
-
-func (s *Storage) RegisterServerInfo(node string, configSrvName string, port int, ip string) error {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-
-	info := serverInfo{
-		IP:        ip,
-		Port:      port,
-		ServerKey: configSrvName,
-		Node:      node,
-		Time:      time.Now().String(),
-	}
-
-	i, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.Do("HSET", "SERVERRUNNING", node, string(i))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Storage) DelServerInfo(node string) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("HDEL", "SERVERRUNNING", node)
-	if err != nil {
-		logger.Error("DelServerInfo", "err", err.Error())
-		return
-	}
-
-	s.delServerRunningTTL(node)
-
-	return
-}
-
 func (s *Storage) DelUserOnline(node string) (err error) {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Warn("DelUserOnline", "err", err.Error())
+		}
+	}(conn)
 
 	key := fmt.Sprintf("%s_USERONLINE_BIT", node)
 	_, err = conn.Do("DEL", key)
@@ -177,59 +84,74 @@ func (s *Storage) DelUserOnline(node string) (err error) {
 	return
 }
 
-func (s *Storage) setUserOnlineTTL(node string) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-
-	key := fmt.Sprintf("%s_USERONLINE_BIT", node)
-	_, err := conn.Do("EXPIRE", key, expireTime)
-	if err != nil {
-		logger.Error("setUserOnlineTTL", "key", key, "err", err.Error())
-		return
-	}
-}
-
 func (s *Storage) UserOnline(uid int, node string) error {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("UserOnline", "err", err.Error())
+		}
+	}(conn)
 	key := fmt.Sprintf("%s_USERONLINE_BIT", node)
 	_, err := conn.Do("SETBIT", key, uid, Online)
 	if err != nil {
 		return err
 	}
+
+	_, err = conn.Do("HSET", "USERONLINE", uid, node)
+	if err != nil {
+		return err
+	}
+
 	logger.Info("", "key", "UserOnline", "uid", uid, "node", node, "redis_key", key)
 	return nil
 }
 func (s *Storage) UserOffline(uid int, node string) error {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("UserOffline", "err", err.Error())
+		}
+	}(conn)
 	key := fmt.Sprintf("%s_USERONLINE_BIT", node)
 	_, err := conn.Do("SETBIT", key, uid, Offline)
 	if err != nil {
 		return err
 	}
+
+	_, err = conn.Do("HDEL", "USERONLINE", uid, node)
+	if err != nil {
+		return err
+	}
+
 	logger.Info("", "key", "UserOffline", "uid", uid, "node", node, "redis_key", key)
 	return nil
 }
-func (s *Storage) IsUserOnline(uid int) (bool, string, error) {
+func (s *Storage) IsUserOnline(uid int) bool {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
-	nodes, err := redis.StringMap(conn.Do("HGETALL", "SERVERRUNNING"))
-	if err != nil {
-		return false, "", err
-	}
-	for k := range nodes {
-		key := fmt.Sprintf("%s_USERONLINE_BIT", k)
-		if ok, _ := redis.Bool(conn.Do("GETBIT", key, uid)); ok {
-			return true, k, nil
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("IsUserOnline", "err", err.Error())
 		}
+	}(conn)
+
+	key := fmt.Sprintf("%s_USERONLINE_BIT", constant.ServerName)
+	if ok, _ := redis.Bool(conn.Do("GETBIT", key, uid)); ok {
+		return true
 	}
-	return false, "", nil
+	return false
 }
 
 func (s *Storage) concurrentUser(node string) (num int) {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("concurrentUser", "err", err.Error())
+		}
+	}(conn)
 	key := fmt.Sprintf("%s_USERONLINE_BIT", node)
 	_, err := redis.Int(conn.Do("BITCOUNT", key))
 	if err != nil {
@@ -239,42 +161,45 @@ func (s *Storage) concurrentUser(node string) (num int) {
 	return
 }
 
-func (s *Storage) CreateRankID(key string) (int, error) {
+// AllUserOnline 获取所有在线用户
+func (s *Storage) AllUserOnline() (users []int) {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
-	gid, err := redis.Int(conn.Do("INCR", key))
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("AllUserOnline", "err", err.Error())
+		}
+	}(conn)
+
+	keys, err := redis.Strings(conn.Do("HKEYS", "USERONLINE"))
 	if err != nil {
-		return 0, err
+		logger.Error("AllUserOnline", "err", err.Error())
+		return
 	}
-	return gid, nil
+
+	for _, key := range keys {
+		uid, _ := strconv.Atoi(key)
+		users = append(users, uid)
+	}
+
+	return
 }
+
 func (s *Storage) CreateUserID() (int, error) {
 	conn := s.RedisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("CreateUserID", "err", err.Error())
+		}
+	}(conn)
 	uid, err := redis.Int(conn.Do("INCR", "USERID"))
 	if err != nil {
 		return 0, err
 	}
 	return uid, nil
 }
-func (s *Storage) CreateBillID() (int, error) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-	uid, err := redis.Int(conn.Do("INCR", "BILLID"))
-	if err != nil {
-		return 0, err
-	}
-	return uid, nil
-}
-func (s *Storage) CreateInboxID() (int, error) {
-	conn := s.RedisConn.Get()
-	defer conn.Close()
-	uid, err := redis.Int(conn.Do("DECR", "INBOXID"))
-	if err != nil {
-		return 0, err
-	}
-	return uid, nil
-}
+
 func (s *Storage) GetUser(filter bson.D) (singleResult *mongo.SingleResult, err error) {
 	collection := s.MongoDB.Database(constant.DB).Collection("user")
 
@@ -322,6 +247,34 @@ func (s *Storage) UpdateUserToken(filter bson.D, update bson.D) error {
 func (s *Storage) UpdateUser(filter bson.D, update bson.D) error {
 	collection := s.MongoDB.Database(constant.DB).Collection("user")
 	_, err := collection.UpdateOne(context.TODO(), filter, update)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateMapId 新增地图编号
+func (s *Storage) CreateMapId() (int, error) {
+	conn := s.RedisConn.Get()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("CreateMapId", "err", err.Error())
+		}
+	}(conn)
+	roomId, err := redis.Int(conn.Do("incr", "MapId"))
+	if err != nil {
+		return roomId, err
+	}
+
+	return roomId, nil
+}
+
+// CreateMap 创建地图
+func (s *Storage) CreateMap(document interface{}) error {
+	collection := s.MongoDB.Database(constant.DB).Collection("map")
+
+	_, err := collection.InsertOne(context.TODO(), document)
 	if err != nil {
 		return err
 	}

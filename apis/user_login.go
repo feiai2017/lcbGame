@@ -35,7 +35,7 @@ func UserLogin(c *tcpx.Context) {
 	var resp protocol.RespUserLogin
 
 	defer func() {
-		err := c.JSON(constant.USER_LOGIN, resp)
+		err := c.JSON(constant.UserLogin, resp)
 		if err != nil {
 			log.SetLogLevel("error")
 			log.Append("send resp failed", "err", err)
@@ -49,7 +49,7 @@ func UserLogin(c *tcpx.Context) {
 	if err != nil {
 		log.SetLogLevel("error")
 		log.Append("decode req failed", "err", err)
-		resp.Code = constant.ERR_JSON_MARSHALLER_FAIL
+		resp.Code = constant.ErrJsonMarshallerFail
 		return
 	}
 	log.Append("", "req", req)
@@ -57,125 +57,67 @@ func UserLogin(c *tcpx.Context) {
 	if req.Duid == "" {
 		log.SetLogLevel("error")
 		log.Append("err req argument")
-		resp.Code = constant.ERR_JSON_MARSHALLER_FAIL
+		resp.Code = constant.ErrJsonMarshallerFail
 		return
 	}
 
-	duid := ""
 	platform := 0
-	if req.Credential != "" {
-		platform = 4
-		duid = req.Credential
-	} else if req.GoogleID != "" {
-		platform = 3
-		duid = req.GoogleID
-	} else if req.FaceBookID != "" {
-		platform = 2
-		duid = req.FaceBookID
-	} else if req.AppleID != "" {
-		platform = 1
-		duid = req.AppleID
-	} else {
-		platform = 0
-		duid = req.Duid
-	}
+	duid := req.Duid
 
 	uid, credential, usr, err, _ := service.Login(duid, platform, req.Duid)
 	if err != nil {
 		if err.Error() == "error credential" {
 			log.SetLogLevel("warn")
 			log.Append("user.Login failed", "err", err.Error())
-			resp.Code = constant.ERR_TOKEN
+			resp.Code = constant.ErrToken
 			return
 		}
 
 		log.SetLogLevel("error")
 		log.Append("user.Login failed", "err", err)
-		resp.Code = constant.ERR_JSON_MARSHALLER_FAIL
+		resp.Code = constant.ErrJsonMarshallerFail
 		return
 	}
 	if uid == 0 || credential == "" || usr == nil {
 		log.SetLogLevel("error")
 		log.Append("login or create user failed", "err", err)
-		resp.Code = constant.ERR_GET_TCP_USER_FAIL
+		resp.Code = constant.ErrGetTcpUserFail
 		return
 	}
 	log.Append("", "uid", uid)
 
-	// 检查用户数据是否在服务器内存中
-	online, serverName, err := service.UserStatus(usr.UID)
-	if err != nil {
-		log.SetLogLevel("error")
-		log.Append("get user online status failed", "err", err)
-		resp.Code = constant.ERR_GET_TCP_USER_FAIL
-		return
-	}
-
-	// 在本机内存中
-	if online == constant.LOCAL_ONLINE {
-		log.Append("Re login")
-		// 获取用户数据
-		oldUser, _ := model.Get(uid)
-		if oldUser != nil {
-			// 保存
-			err = service.UpdateUserByObject(oldUser)
-			if err != nil {
-				log.SetLogLevel("error")
-				log.Append("user.UpdateUserByObject", "err", err.Error())
-			}
-
-			// 如果是新的socket,关闭旧的socket
-			oldTCPXContext := oldUser.Conn
-			if oldTCPXContext != nil && oldTCPXContext.Conn != c.Conn {
-				log.Append("oldTCPXContext.Conn != c.Conn")
-				service.UserOut(oldTCPXContext, 3, true)
-			}
-
-			time.Sleep(time.Millisecond * 500)
-
-			filter := bson.D{{Key: "uid", Value: uid}}
-			usr, err = service.GetUser(filter)
-			if err != nil {
-				log.SetLogLevel("error")
-				log.Append("user.GetUser error", "err", err.Error())
-				resp.Code = constant.ERR_GET_TCP_USER_FAIL
-				return
-			}
+	log.Append("Re login")
+	// 获取用户数据
+	oldUser, _ := model.Get(uid)
+	if oldUser != nil {
+		// 保存
+		err = service.UpdateUserByObject(oldUser)
+		if err != nil {
+			log.SetLogLevel("error")
+			log.Append("user.UpdateUserByObject", "err", err.Error())
 		}
-	} else if online == constant.OTHER_ONLINE {
-		log.Append("another server", "serverName", serverName)
-		service.SendForcedUserOffline(uid)
 
-		start := time.Now()
-		for {
-			time.Sleep(time.Millisecond * 500)
-
-			online, serverName, _ := service.UserStatus(usr.UID)
-			if online != constant.OTHER_ONLINE {
-				// kick成功
-				log.Append("kick success", "serverName", serverName)
-				break
-			}
-
-			if time.Now().Unix()-start.Unix() > 5 {
-				log.SetLogLevel("error")
-				log.Append("kick failed", "serverName", serverName)
-				break
-			}
+		// 如果是新的socket,关闭旧的socket
+		oldTCPXContext := oldUser.Conn
+		if oldTCPXContext != nil && oldTCPXContext.Conn != c.Conn {
+			log.Append("oldTCPXContext.Conn != c.Conn")
+			service.UserOut(oldTCPXContext, 3, true)
 		}
+
+		time.Sleep(time.Millisecond * 500)
 
 		filter := bson.D{{Key: "uid", Value: uid}}
 		usr, err = service.GetUser(filter)
 		if err != nil {
 			log.SetLogLevel("error")
-			log.Append("user.GetUser error", "err", err)
-			resp.Code = constant.ERR_GET_TCP_USER_FAIL
+			log.Append("user.GetUser error", "err", err.Error())
+			resp.Code = constant.ErrGetTcpUserFail
 			return
 		}
 	}
 
 	_ = model.Set(usr)
-	err = control.Store.UserOnline(usr.UID, constant.SERVER_NAME)
+	err = control.Store.UserOnline(usr.UID, constant.ServerName)
 	if err != nil {
 		log.SetLogLevel("error")
 		log.Append("user online failed", "err", err)

@@ -3,6 +3,7 @@ package control
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
+	"mania/logger"
 	"mania/model"
 	"os"
 )
@@ -15,7 +16,12 @@ func LoadConfigFromFile(path string) error {
 		err = errors.Wrap(err, "read config.json failed")
 		return err
 	}
-	defer filePtr.Close()
+	defer func(filePtr *os.File) {
+		err := filePtr.Close()
+		if err != nil {
+			logger.Error("", "错误信息", errors.Unwrap(err), "调用栈：", err)
+		}
+	}(filePtr)
 
 	// 创建json解码器
 	decoder := json.NewDecoder(filePtr)
@@ -33,8 +39,4 @@ func GetRedisSource() *model.Redis {
 }
 func GetMongodbSource() *model.Mongodb {
 	return c.Mongodb
-}
-
-func GetFeishuUrl() string {
-	return c.FeishuUrl
 }

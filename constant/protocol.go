@@ -1,10 +1,10 @@
 package constant
 
-const SERVER_NAME = "lechengbao"
+const ServerName = "lechengbao"
 
 const (
-	USER_LOGIN   = 1
-	SNAKE_LADDER = 2
-	HEART_BEAT   = 200
-	USER_OUT     = 1019
+	UserLogin   = 1
+	SnakeLadder = 2
+	HeartBeat   = 200
+	UserOut     = 1019
 )

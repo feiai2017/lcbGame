@@ -9,5 +9,5 @@ type ReqSnakeLadder struct {
 type RespSnakeLadder struct {
 	CommonError
 	Result   *model.RollSnakeLadder `json:"result,omitempty"`
-	Playback [][]int                `json:"playback,omitempty"`
+	Playback []model.Points         `json:"playback,omitempty"`
 }

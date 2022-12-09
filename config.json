@@ -1,15 +1,14 @@
 {
   "redis": {
-    "path": "ip:6379",
+    "path": "192.168.2.103:6379",
     "sentinel": [],
-    "password": "password",
-    "db":0
+    "password": "123456",
+    "db": 0
   },
   "mongodb": {
-    "path": "mongodb+srv://ip/?tlsCAFile=%s&tlsCertificateKeyFile=%s",
+    "path": "mongodb://user:123456@192.168.2.103:27017/lechengbao",
     "ca_file_path": "./X509-cert.pem",
     "cert_pem_path": "./X509-cert.pem",
     "key_pem_path": "./X509-cert.pem"
-  },
-  "feishu_url": "webhook"
+  }
 }

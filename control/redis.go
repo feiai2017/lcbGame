@@ -3,6 +3,7 @@ package control
 import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
+	"mania/logger"
 	"mania/model"
 	"time"
 )
@@ -31,7 +32,12 @@ func ConnectRedis(dataSource *model.Redis) (*redis.Pool, error) {
 		},
 	}
 	conn := redisConn.Get()
-	defer conn.Close()
+	defer func(conn redis.Conn) {
+		err := conn.Close()
+		if err != nil {
+			logger.Error("", "错误信息", errors.Unwrap(err), "调用栈：", err)
+		}
+	}(conn)
 
 	_, err := conn.Do("PING")
 

@@ -54,7 +54,7 @@ func Recover(c *tcpx.Context) {
 			}
 
 			err := &protocol.CommonError{
-				Code: constant.ERR_JSON_MARSHALLER_FAIL,
+				Code: constant.ErrJsonMarshallerFail,
 			}
 			_ = c.JSON(protocolID, err)
 			return

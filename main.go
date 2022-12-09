@@ -22,9 +22,8 @@ import (
 var (
 	configPath  = flag.String("config", `config.json`, "config file path")
 	showVersion = flag.Bool("version", false, "show server version")
-	logPath     = flag.String("path", `log`, "set log path")
 
-	// 编译参数
+	// BuildTime 编译参数
 	BuildTime string
 	CommitID  string
 	LogLevel  string
@@ -47,9 +46,7 @@ func main() {
 		return
 	}
 
-	logger.InitZap(LogLevel, constant.SERVER_NAME, *logPath, control.GetFeishuUrl())
-
-	err = control.Store.Connect(constant.SERVER_NAME)
+	err = control.Store.Connect(constant.ServerName)
 	if err != nil {
 		logger.ErrorSync("", "错误信息", errors.Unwrap(err), "调用栈：", err)
 		return
@@ -69,14 +66,13 @@ func main() {
 	srv.Use("logger", middleware.Logger)
 	srv.Use("recover", middleware.Recover)
 	srv.HeartBeatModeDetail(true, time.Minute, false, 200)
-	srv.RewriteHeartBeatHandler(constant.HEART_BEAT, apis.HeartBeat)
-	srv.AddHandler(constant.USER_LOGIN, apis.UserLogin)
-	srv.AddHandler(constant.SNAKE_LADDER, apis.SnakeLadder)
+	srv.RewriteHeartBeatHandler(constant.HeartBeat, apis.HeartBeat)
+	srv.AddHandler(constant.UserLogin, apis.UserLogin)
+	srv.AddHandler(constant.SnakeLadder, apis.SnakeLadder)
 
 	msg := fmt.Sprintf("build-time:%s\ncommit-id:%s\nlog-level:%s\ntime:%s\ncost:%dms\n",
 		BuildTime, CommitID, LogLevel, time.Now().String(), time.Now().Sub(t).Milliseconds())
 
-	logger.SendFeishu([]byte("start：" + msg))
 	logger.Warn("start", "msg", msg)
 	fmt.Println("start")
 
@@ -87,7 +83,7 @@ func main() {
 
 	err = srv.ListenAndServe("tcp", ":7170")
 	if err != nil {
-		logger.SendFeishu([]byte("server启动失败：\n" + err.Error()))
+		logger.Warn("server启动失败：\n" + err.Error())
 	}
 
 	<-shutdown
@@ -99,7 +95,6 @@ func catch() {
 			control.SrvConfig.BuildTime, control.SrvConfig.CommitID,
 			control.SrvConfig.LogLevel, fmt.Sprintf("%v", r), time.Now().String())
 		logger.Error("server关闭1", "msg", msg)
-		logger.SendFeishu([]byte("server关闭1：\n" + msg))
 	}
 }
 
@@ -118,7 +113,6 @@ func Wait(shutdown chan int) {
 				//if SaveAllAndCloseConn() {
 				//}
 				control.Store.CloseDB()
-				logger.SendFeishu([]byte("server关闭2：\n" + msg))
 				logger.Warn("server关闭2", "msg", msg)
 				close(shutdown)
 			default:

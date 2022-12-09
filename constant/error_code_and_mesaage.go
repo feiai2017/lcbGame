@@ -7,7 +7,7 @@ package constant
 // 例如：method 11 产生的错误。     11 + 001 = 11001
 
 const SUCCESS = "00000"
-const ERR_JSON_MARSHALLER_FAIL = "00001"
-const ERR_GET_TCP_USER_FAIL = "00003"
-const ERR_TOKEN = "10001"
-const GAME_ERROR = "20001"
+const ErrJsonMarshallerFail = "00001"
+const ErrGetTcpUserFail = "00003"
+const ErrToken = "10001"
+const GameError = "20001"

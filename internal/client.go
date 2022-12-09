@@ -27,10 +27,10 @@ func main() {
 
 	mutex.Lock()
 	buf, e := tcpx.PackWithMarshaller(tcpx.Message{
-		MessageID: 1,
+		MessageID: constant.LocalOnline,
 		Body: protocol.ReqUserLogin{
 			Credential: "",
-			Duid:       "1625040488_lihenan_82",
+			Duid:       "1625040488_lihenan_85",
 			Package:    "",
 			PID:        1,
 			P:          1,
@@ -44,7 +44,7 @@ func main() {
 
 	mutex.Lock()
 	buf, e = tcpx.PackWithMarshaller(tcpx.Message{
-		MessageID: constant.SNAKE_LADDER,
+		MessageID: constant.SnakeLadder,
 		Body:      protocol.ReqSnakeLadder{Action: 1},
 	}, tcpx.JsonMarshaller{})
 	if e != nil {
@@ -52,30 +52,30 @@ func main() {
 	}
 
 	_, _ = conn.Write(buf)
+	//
+	//for i := 0; i < 50; i++ {
+	//	mutex.Lock()
+	//	buf, e = tcpx.PackWithMarshaller(tcpx.Message{
+	//		MessageID: constant.SNAKE_LADDER,
+	//		Body:      protocol.ReqSnakeLadder{Action: 2},
+	//	}, tcpx.JsonMarshaller{})
+	//	if e != nil {
+	//		panic(e)
+	//	}
+	//
+	//	conn.Write(buf)
+	//}
+	//
+	//mutex.Lock()
+	//buf, e = tcpx.PackWithMarshaller(tcpx.Message{
+	//	MessageID: constant.SNAKE_LADDER,
+	//	Body:      protocol.ReqSnakeLadder{Action: 3},
+	//}, tcpx.JsonMarshaller{})
+	//if e != nil {
+	//	panic(e)
+	//}
+	//
+	//conn.Write(buf)
 
-	for i := 0; i < 50; i++ {
-		mutex.Lock()
-		buf, e = tcpx.PackWithMarshaller(tcpx.Message{
-			MessageID: constant.SNAKE_LADDER,
-			Body:      protocol.ReqSnakeLadder{Action: 2},
-		}, tcpx.JsonMarshaller{})
-		if e != nil {
-			panic(e)
-		}
-
-		conn.Write(buf)
-	}
-
-	mutex.Lock()
-	buf, e = tcpx.PackWithMarshaller(tcpx.Message{
-		MessageID: constant.SNAKE_LADDER,
-		Body:      protocol.ReqSnakeLadder{Action: 3},
-	}, tcpx.JsonMarshaller{})
-	if e != nil {
-		panic(e)
-	}
-
-	conn.Write(buf)
-
-	time.Sleep(2 * time.Second)
+	time.Sleep(200 * time.Second)
 }

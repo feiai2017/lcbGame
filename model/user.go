@@ -55,16 +55,13 @@ func (usr *User) Log(log *logger.Logger) {
 type Token struct {
 	Duid       string
 	UID        int
-	FacebookID string
-	AppleID    string
 	Credential string
-	GoogleID   string
 }
 
 func (t *Token) GenerateCertificate() {
-	raw := strconv.Itoa(t.UID) + t.Duid + t.AppleID + t.FacebookID
+	raw := strconv.Itoa(t.UID) + t.Duid
 	l := strconv.Itoa(len(raw))
-	sum := sha256.Sum256([]byte(raw + l + constant.SERVER_NAME))
+	sum := sha256.Sum256([]byte(raw + l + constant.ServerName))
 	sumsha1 := sha1.Sum(sum[:])
 	t.Credential = hex.EncodeToString(sumsha1[:])
 

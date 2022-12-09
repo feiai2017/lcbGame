@@ -3,7 +3,6 @@ package model
 type Config struct {
 	Redis        *Redis         `json:"redis"`
 	Mongodb      *Mongodb       `json:"mongodb"`
-	FeishuUrl    string         `json:"feishu_url"`
 	BlackListMap map[string]int `json:"-"`
 	WhiteListMap map[string]int `json:"-"`
 }

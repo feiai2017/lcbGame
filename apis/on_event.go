@@ -48,7 +48,7 @@ func OnClose(c *tcpx.Context) {
 		log.SetLogLevel("error")
 		log.Append(fmt.Sprintf("save user failed uid = [%d]", uid), "err2", err2)
 	} else {
-		err3 := control.Store.UserOffline(uid, constant.SERVER_NAME)
+		err3 := control.Store.UserOffline(uid, constant.ServerName)
 		if err3 != nil {
 			log.SetLogLevel("error")
 			log.Append("user offline failed", "err3", err3)

@@ -48,18 +48,6 @@ func GetUser(filter bson.D) (u *model.User, err error) {
 	}
 	return u, err
 }
-func UpdateUser(uid int) (err error) {
-	usr, err := model.Get(uid)
-	if err != nil {
-		return fmt.Errorf("user is nil")
-	}
-
-	filter := bson.D{{Key: "uid", Value: uid}}
-	update := bson.D{
-		{Key: "$set", Value: usr},
-	}
-	return control.Store.UpdateUser(filter, update)
-}
 
 func UpdateUserByObject(usr *model.User) (err error) {
 	filter := bson.D{{Key: "uid", Value: usr.UID}}
@@ -102,57 +90,10 @@ func UpdateUserToken(token *model.Token) (err error) {
 	return control.Store.UpdateUserToken(filter, update)
 }
 
-func UserStatus(uid int) (int, string, error) {
-	if _, err := model.Get(uid); err == nil {
-		return constant.LOCAL_ONLINE, "", nil
-	}
-
-	online, serverName, err := control.Store.IsUserOnline(uid)
-	if err != nil {
-		return 0, "", err
-	}
-	if online {
-		if serverName == constant.SERVER_NAME {
-			return constant.LOCAL_ONLINE, "", nil
-		}
-
-		return constant.OTHER_ONLINE, serverName, nil
-	} else {
-		return constant.OFFLINE, serverName, nil
-	}
-}
-
-func SendForcedUserOffline(uid int) {
-	//rmq := control.RedisStreamMQClient{
-	//	ConnPool:     control.Store.RedisConn,
-	//	StreamKey:    "stream::kick::user",
-	//	StreamLen:    100,
-	//	GroupName:    "",
-	//	ConsumerName: "",
-	//}
-	//
-	//strMsgId, err := rmq.PutMsg("", strconv.Itoa(uid), "1")
-	//if err != nil {
-	//	return
-	//}
-
-	//logger.Info("SendForcedUserOffline", "key", "kick", "msgId", strMsgId, "uid", uid)
-}
-
 func Login(loginToken string, platform int, deviceID string) (uid int, credential string, u *model.User, err error, isFirstLogin bool) {
 	var filter bson.D
-	switch platform {
-	case 0:
-		filter = bson.D{{Key: "duid", Value: loginToken}}
-	case 1:
-		filter = bson.D{{Key: "appleid", Value: loginToken}}
-	case 2:
-		filter = bson.D{{Key: "facebookid", Value: loginToken}}
-	case 3:
-		filter = bson.D{{Key: "googleid", Value: loginToken}}
-	case 4:
-		filter = bson.D{{Key: "credential", Value: loginToken}}
-	}
+	filter = bson.D{{Key: "duid", Value: loginToken}}
+
 	token, err := GetUserToken(filter)
 	if err != nil && err != mongo.ErrNoDocuments {
 		return
@@ -175,49 +116,15 @@ func Login(loginToken string, platform int, deviceID string) (uid int, credentia
 
 		// duid找到了 更新帐号
 		if getUserToken != nil {
-			if platform == 1 {
-				if getUserToken.AppleID == "" {
-					getUserToken.AppleID = loginToken
-					token = getUserToken
-					filter = bson.D{{Key: "uid", Value: token.UID}}
-					user, err = GetUser(filter)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-					err := UpdateUserToken(token)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-				}
-
-			} else if platform == 2 {
-				if getUserToken.FacebookID == "" {
-					getUserToken.FacebookID = loginToken
-					token = getUserToken
-					filter = bson.D{{Key: "uid", Value: token.UID}}
-					user, err = GetUser(filter)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-					err := UpdateUserToken(token)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-				}
-			} else if platform == 3 {
-				if getUserToken.GoogleID == "" {
-					getUserToken.GoogleID = loginToken
-					token = getUserToken
-					filter = bson.D{{Key: "uid", Value: token.UID}}
-					user, err = GetUser(filter)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-					err := UpdateUserToken(token)
-					if err != nil {
-						return uid, credential, u, err, false
-					}
-				}
+			token = getUserToken
+			filter = bson.D{{Key: "uid", Value: token.UID}}
+			user, err = GetUser(filter)
+			if err != nil {
+				return uid, credential, u, err, false
+			}
+			err := UpdateUserToken(token)
+			if err != nil {
+				return uid, credential, u, err, false
 			}
 		}
 
@@ -226,19 +133,7 @@ func Login(loginToken string, platform int, deviceID string) (uid int, credentia
 			newToken := model.Token{
 				Duid:       deviceID,
 				UID:        0,
-				FacebookID: "",
-				AppleID:    "",
 				Credential: "",
-				GoogleID:   "",
-			}
-
-			switch platform {
-			case 1:
-				newToken.AppleID = loginToken
-			case 2:
-				newToken.FacebookID = loginToken
-			case 3:
-				newToken.GoogleID = loginToken
 			}
 
 			user, token = CreateUser(newToken)
@@ -277,7 +172,7 @@ func UserOut(c *tcpx.Context, sign int, closeConn bool) {
 
 	if sign == 3 {
 		resp.Sign = sign
-		err := c.JSON(constant.USER_OUT, &resp)
+		err := c.JSON(constant.UserOut, &resp)
 		if err != nil {
 			logger.Warn("USER_OUT", "uid", uid, "err", err.Error(), "sign", sign)
 		}
@@ -290,7 +185,7 @@ func UserOut(c *tcpx.Context, sign int, closeConn bool) {
 		defer func() {
 			if sign == 1 || sign == 2 {
 				resp.Sign = sign
-				err := c.JSON(constant.USER_OUT, &resp)
+				err := c.JSON(constant.UserOut, &resp)
 				if err != nil {
 					logger.Warn("USER_OUT", "uid", uid, "err", err.Error(), "sign", sign)
 				}

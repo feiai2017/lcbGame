@@ -20,7 +20,7 @@ func SnakeLadder(c *tcpx.Context) {
 	var resp protocol.RespSnakeLadder
 
 	defer func() {
-		err := c.JSON(constant.SNAKE_LADDER, resp)
+		err := c.JSON(constant.SnakeLadder, resp)
 		if err != nil {
 			log.SetLogLevel("error")
 			log.Append("send resp failed", "err", err)
@@ -35,7 +35,7 @@ func SnakeLadder(c *tcpx.Context) {
 	if !ok {
 		log.SetLogLevel("warn")
 		log.Append("uid is wrong")
-		resp.Code = constant.ERR_GET_TCP_USER_FAIL
+		resp.Code = constant.ErrGetTcpUserFail
 		return
 	}
 	uid = rawUid.(int)
@@ -44,7 +44,7 @@ func SnakeLadder(c *tcpx.Context) {
 	if err != nil {
 		log.SetLogLevel("warn")
 		log.Append("user is nil", "err", err)
-		resp.Code = constant.ERR_GET_TCP_USER_FAIL
+		resp.Code = constant.ErrGetTcpUserFail
 		return
 	}
 	usr.Log(log)
@@ -52,7 +52,7 @@ func SnakeLadder(c *tcpx.Context) {
 	if err != nil {
 		log.SetLogLevel("error")
 		log.Append("decode req failed", "err", err)
-		resp.Code = constant.ERR_JSON_MARSHALLER_FAIL
+		resp.Code = constant.ErrJsonMarshallerFail
 		return
 	}
 	log.Append("recv req", "req", req)
@@ -67,7 +67,7 @@ func SnakeLadder(c *tcpx.Context) {
 		if err != nil {
 			log.SetLogLevel("error")
 			log.Append("decode req failed", "err", err)
-			resp.Code = constant.GAME_ERROR
+			resp.Code = constant.GameError
 			return
 		}
 	// 3：回放

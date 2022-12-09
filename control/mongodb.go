@@ -2,7 +2,6 @@ package control
 
 import (
 	"context"
-	"fmt"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -14,22 +13,10 @@ import (
 )
 
 func ConnectMongoDB(dataSource *model.Mongodb, configSrvName string) (*mongo.Client, error) {
-	// 设置客户端连接配置
-	// add 20220607
-	// write concern : majority , timeout: 1s
-	// read concern : majority
 	clientOptions := options.Client().ApplyURI(dataSource.Path).
 		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.WTimeout(time.Second))).
 		SetReadPreference(readpref.Primary()).
 		SetReadConcern(readconcern.Majority())
-	if dataSource.CaFilePath != "" {
-		uri := fmt.Sprintf(dataSource.Path, dataSource.CaFilePath, dataSource.CertPemPath)
-		credential := options.Credential{
-			AuthMechanism: "MONGODB-X509",
-		}
-		clientOptions = options.Client().ApplyURI(uri).SetAuth(credential)
-		clientOptions.TLSConfig.InsecureSkipVerify = true
-	}
 
 	// 连接到MongoDB
 	db, err := mongo.Connect(context.TODO(), clientOptions,

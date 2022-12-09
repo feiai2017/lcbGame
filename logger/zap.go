@@ -19,8 +19,6 @@ type Logger struct {
 	MsgChain     string
 }
 
-var feishu_url string
-
 func NewLog() Logger {
 	return Logger{
 		LogLevel: "info",
@@ -48,7 +46,6 @@ func (l *Logger) LogExceptInfo() {
 		buf, _ := json.MarshalIndent(l, "  ", "  ")
 		now := time.Now().String()
 		buf = append(buf, now...)
-		go SendFeishu(buf)
 		zapLog.Errorw(l.MsgChain, l.KeyAndValues...)
 	case "dpanic":
 		zapLog.DPanicw(l.MsgChain, l.KeyAndValues...)
@@ -72,7 +69,6 @@ func (l *Logger) Log() {
 		buf, _ := json.MarshalIndent(l, "  ", "  ")
 		now := time.Now().String()
 		buf = append(buf, now...)
-		go SendFeishu(buf)
 		zapLog.Errorw(l.MsgChain, l.KeyAndValues...)
 	case "dpanic":
 		zapLog.DPanicw(l.MsgChain, l.KeyAndValues...)
@@ -130,7 +126,6 @@ func InitZap(level string, srvName string, logPath string, alertWebHook string) 
 	//logger = logger.WithOptions(zap.AddCallerSkip(1))
 
 	zapLog = logger.Sugar()
-	feishu_url = alertWebHook
 }
 
 // getEncoderConfig 获取zapcore.EncoderConfig
@@ -197,13 +192,9 @@ func Warn(msg string, keysAndValues ...interface{}) {
 	zapLog.Warnw(msg, keysAndValues...)
 }
 func Error(msg string, keysAndValues ...interface{}) {
-	buf := fmt.Sprintf("error:%s %#v", msg, keysAndValues)
-	go SendFeishu([]byte(buf))
 	zapLog.Errorw(msg, keysAndValues...)
 }
 func ErrorSync(msg string, keysAndValues ...interface{}) {
-	buf := fmt.Sprintf("error:%s %#v", msg, keysAndValues)
-	SendFeishu([]byte(buf))
 	zapLog.Errorw(msg, keysAndValues...)
 }
 func Panic(msg string, keysAndValues ...interface{}) {
